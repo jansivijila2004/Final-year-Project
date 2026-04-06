@@ -12,22 +12,38 @@ app = Flask(__name__)
 BLOCK_FILE = "blocked_ips.txt"
 LOG_FILE = "attack_log.txt"
 
+# # ---------------- EMAIL CONFIG ----------------
+# EMAIL_USER = "vinithvinith35614@gmail.com"
+# EMAIL_PASSWORD = "YOUR_APP_PASSWORD"   # ⚠️ Use Gmail App Password
+# RECIPIENT_EMAIL = "vinithvinith2207@gmail.com"
+
 # Email Configuration
 EMAIL_USER = "projectmail0410@gmail.com"
 EMAIL_PASSWORD = "jrlxdsdguzwxxbdm"
 RECIPIENT_EMAIL = "jansivijila@gmail.com"
+
+# ---------------- GET REAL CLIENT IP ----------------
+def get_client_ip():
+    ip = request.headers.get('X-Forwarded-For')
+
+    if ip:
+        ip = ip.split(',')[0].strip()
+    else:
+        ip = request.remote_addr
+
+    return ip
 
 
 # ---------------- EMAIL ALERT ----------------
 def send_email_alert(ip, attack_type):
     subject = f"Security Alert: {attack_type} Detected!"
     body = f"""
-    SECURITY ALERT
-    -----------------
-    Attack Type: {attack_type}
-    Attacker IP: {ip}
-    Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-    """
+SECURITY ALERT
+-----------------
+Attack Type: {attack_type}
+Attacker IP: {ip}
+Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+"""
 
     msg = MIMEMultipart()
     msg['From'] = EMAIL_USER
@@ -39,8 +55,9 @@ def send_email_alert(ip, attack_type):
         with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
             server.login(EMAIL_USER, EMAIL_PASSWORD)
             server.send_message(msg)
+            print("✅ Email sent successfully")
     except Exception as e:
-        print("Email Error:", e)
+        print("❌ Email Error:", e)
 
 
 # ---------------- IP BLOCK ----------------
@@ -56,6 +73,7 @@ def block_ip(ip):
     if not is_blocked(ip):
         with open(BLOCK_FILE, "a") as f:
             f.write(ip + "\n")
+        print(f"🚫 IP Blocked: {ip}")
 
 
 # ---------------- LOG ----------------
@@ -101,22 +119,24 @@ def home():
 @app.route("/", methods=["GET", "POST"])
 def login():
 
-    ip = request.remote_addr
+    ip = get_client_ip()
+    print("User IP:", ip)   # Debug
 
+    # Check blocked
     if is_blocked(ip):
-        return f"Your IP ({ip}) is blocked"
+        return f"🚫 Your IP ({ip}) is blocked"
 
     if request.method == "POST":
 
         username = request.form["username"]
         password = request.form["password"]
 
-        # Injection Check
+        # 🔴 Injection Check
         if detect_injection(username) or detect_injection(password):
             block_ip(ip)
             log_attack(ip, "Injection")
             send_email_alert(ip, "Injection")
-            return "Malicious Input Detected. IP Blocked"
+            return "⚠️ Malicious Input Detected. IP Blocked"
 
         db = get_db()
         users = db["users"]
@@ -126,15 +146,17 @@ def login():
             "password": password
         })
 
+        # ✅ SUCCESS LOGIN
         if user:
             return redirect(url_for("home"))
 
         else:
+            # 🔴 Brute Force Check
             if detect_bruteforce(ip):
                 block_ip(ip)
                 log_attack(ip, "Brute Force")
                 send_email_alert(ip, "Brute Force")
-                return "Brute Force Detected. IP Blocked"
+                return "🚫 Brute Force Detected. IP Blocked"
 
             return render_template("login.html", error="Invalid Login")
 

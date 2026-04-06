@@ -8,7 +8,7 @@ import time
 # url = "http://127.0.0.1:5001/"
 
 # Render:
-url = "https://your-app.onrender.com/"
+url = "https://final-year-project-1-icnv.onrender.com"
 
 username = "admin"
 
